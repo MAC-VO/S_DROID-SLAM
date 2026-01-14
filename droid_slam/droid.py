@@ -19,6 +19,7 @@ class Droid:
         self.load_weights(args.weights)
         self.args = args
         self.disable_vis = args.disable_vis
+        self.vo_only = args.vo_only  # VO-only mode skips global BA
 
         # store images, depth, poses, intrinsics (shared between processes)
         self.video = DepthVideo(args.image_size, args.buffer, stereo=args.stereo)
@@ -73,13 +74,13 @@ class Droid:
 
         del self.frontend
 
-        torch.cuda.empty_cache()
-        print("#" * 32)
-        self.backend(7)
+        # Global BA for loop closure (skip in VO-only mode)
+        if not self.vo_only:
+            torch.cuda.empty_cache()
+            self.backend(7)
 
-        torch.cuda.empty_cache()
-        print("#" * 32)
-        self.backend(12)
+            torch.cuda.empty_cache()
+            self.backend(12)
 
         camera_trajectory = self.traj_filler(stream)
         return camera_trajectory.inv().data.cpu().numpy()
