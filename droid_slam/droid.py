@@ -2,12 +2,12 @@ import torch
 import lietorch
 import numpy as np
 
-from droid_net import DroidNet
-from depth_video import DepthVideo
-from motion_filter import MotionFilter
-from droid_frontend import DroidFrontend
-from droid_backend import DroidBackend
-from trajectory_filler import PoseTrajectoryFiller
+from .droid_net import DroidNet
+from .depth_video import DepthVideo
+from .motion_filter import MotionFilter
+from .droid_frontend import DroidFrontend
+from .droid_backend import DroidBackend
+from .trajectory_filler import PoseTrajectoryFiller
 
 from collections import OrderedDict
 from torch.multiprocessing import Process
@@ -34,7 +34,7 @@ class Droid:
 
         # visualizer
         if not self.disable_vis:
-            from visualizer.droid_visualizer import visualization_fn
+            from .visualizer.droid_visualizer import visualization_fn
             self.visualizer = Process(target=visualization_fn, args=(self.video, None))
             self.visualizer.start()
 

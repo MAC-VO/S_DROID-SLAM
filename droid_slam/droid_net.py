@@ -4,18 +4,44 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 
-from modules.extractor import BasicEncoder
-from modules.corr import CorrBlock
-from modules.gru import ConvGRU
-from modules.clipping import GradientClip
+from .modules.extractor import BasicEncoder
+from .modules.corr import CorrBlock
+from .modules.gru import ConvGRU
+from .modules.clipping import GradientClip
 
 from lietorch import SE3
-from geom.ba import BA
+from .geom.ba import BA
 
-import geom.projective_ops as pops
-from geom.graph_utils import graph_to_edge_list, keyframe_indicies
+from .geom import projective_ops as pops
+from .geom.graph_utils import graph_to_edge_list, keyframe_indicies
 
-from torch_scatter import scatter_mean
+def scatter_mean_native(src, index, dim):
+    """
+    Native PyTorch replacement for torch_scatter.scatter_mean.
+    Computes mean of elements that share the same index along dim.
+    """
+    dim_size = index.max().item() + 1
+
+    # Expand index to match src shape for dims after scatter dim
+    index_expanded = index
+    for _ in range(dim + 1, src.dim()):
+        index_expanded = index_expanded.unsqueeze(-1)
+    index_expanded = index_expanded.expand_as(src)
+
+    # Sum values with same index
+    out = torch.zeros(
+        src.shape[:dim] + (dim_size,) + src.shape[dim+1:],
+        dtype=src.dtype, device=src.device
+    )
+    out.scatter_add_(dim, index_expanded, src)
+
+    # Count occurrences
+    ones = torch.ones_like(src)
+    count = torch.zeros_like(out)
+    count.scatter_add_(dim, index_expanded, ones)
+    count = count.clamp(min=1)  # Avoid division by zero
+
+    return out / count
 
 
 def cvx_upsample(data, mask):
@@ -64,7 +90,7 @@ class GraphAgg(nn.Module):
         net = self.relu(self.conv1(net))
 
         net = net.view(batch, num, 128, ht, wd)
-        net = scatter_mean(net, ix, dim=1)
+        net = scatter_mean_native(net, ix, dim=1)
         net = net.view(-1, 128, ht, wd)
 
         net = self.relu(self.conv2(net))

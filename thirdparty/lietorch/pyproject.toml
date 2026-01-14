@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lietorch"
+version = "0.2"
+description = "Lie Groups for PyTorch"
+authors = [{name = "teedrz"}]
+requires-python = ">=3.8"
+
+[tool.setuptools]
+packages = ["lietorch"]

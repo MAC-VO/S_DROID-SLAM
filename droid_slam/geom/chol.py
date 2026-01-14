@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import geom.projective_ops as pops
+from . import projective_ops as pops
 
 class CholeskySolver(torch.autograd.Function):
     @staticmethod
