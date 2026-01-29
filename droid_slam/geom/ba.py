@@ -1,11 +1,25 @@
-import lietorch
 import torch
-import torch.nn.functional as F
 
 from .chol import block_solve, schur_solve
 from . import projective_ops as pops
 
-from torch_scatter import scatter_sum
+
+def scatter_sum(src: torch.Tensor, index: torch.Tensor, dim: int, dim_size: int) -> torch.Tensor:
+    """
+    Native PyTorch replacement for torch_scatter.scatter_sum.
+    Sums values from src into positions specified by index along dimension dim.
+    """
+    # Expand index to match src shape for scatter_add
+    index_shape = [1] * src.dim()
+    index_shape[dim] = index.shape[0]
+    index_expanded = index.view(*index_shape).expand_as(src)
+
+    # Create output tensor with the correct shape
+    output_shape = list(src.shape)
+    output_shape[dim] = dim_size
+    output = torch.zeros(output_shape, dtype=src.dtype, device=src.device)
+
+    return output.scatter_add(dim, index_expanded, src)
 
 
 # utility functions for scattering ops
