@@ -19,9 +19,9 @@ __forceinline__ __device__ bool within_bounds(int h, int w, int H, int W) {
 
 template <typename scalar_t>
 __global__ void corr_index_forward_kernel(
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> volume,
-    const torch::PackedTensorAccessor32<float,4,torch::RestrictPtrTraits> coords,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> corr,
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> volume,
+    const torch::PackedTensorAccessor64<float,4,torch::RestrictPtrTraits> coords,
+    torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> corr,
     int r)
 {
   // batch index
@@ -73,9 +73,9 @@ __global__ void corr_index_forward_kernel(
 
 template <typename scalar_t>
 __global__ void corr_index_backward_kernel(
-    const torch::PackedTensorAccessor32<float,4,torch::RestrictPtrTraits> coords,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> corr_grad,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> volume_grad,
+    const torch::PackedTensorAccessor64<float,4,torch::RestrictPtrTraits> coords,
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> corr_grad,
+    torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> volume_grad,
     int r)
 {
   // batch index
@@ -145,9 +145,9 @@ std::vector<torch::Tensor> corr_index_cuda_forward(
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(volume.scalar_type(), "sampler_forward_kernel", ([&] {
     corr_index_forward_kernel<scalar_t><<<blocks, threads>>>(
-      volume.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-      coords.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-      corr.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+      volume.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+      coords.packed_accessor64<float,4,torch::RestrictPtrTraits>(),
+      corr.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
       radius);
    }));
 
@@ -176,9 +176,9 @@ std::vector<torch::Tensor> corr_index_cuda_backward(
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(volume.scalar_type(), "sampler_backward_kernel", ([&] {
     corr_index_backward_kernel<scalar_t><<<blocks, threads>>>(
-      coords.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-      corr_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-      volume_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+      coords.packed_accessor64<float,4,torch::RestrictPtrTraits>(),
+      corr_grad.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+      volume_grad.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
       radius);
    }));
 

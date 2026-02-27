@@ -23,12 +23,12 @@ bool within_bounds(int h, int w, int H, int W) {
 
 template <typename scalar_t>
 __global__ void corr_forward_kernel(int R,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2,
-    const torch::PackedTensorAccessor32<float,5,torch::RestrictPtrTraits> coords,
-    const torch::PackedTensorAccessor32<LongType,1,torch::RestrictPtrTraits> us,
-    const torch::PackedTensorAccessor32<LongType,1,torch::RestrictPtrTraits> vs,
-    torch::PackedTensorAccessor32<scalar_t,6,torch::RestrictPtrTraits> corr)
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap1,
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap2,
+    const torch::PackedTensorAccessor64<float,5,torch::RestrictPtrTraits> coords,
+    const torch::PackedTensorAccessor64<LongType,1,torch::RestrictPtrTraits> us,
+    const torch::PackedTensorAccessor64<LongType,1,torch::RestrictPtrTraits> vs,
+    torch::PackedTensorAccessor64<scalar_t,6,torch::RestrictPtrTraits> corr)
 {
   // diameter
   const int D = 2*R + 2;
@@ -77,14 +77,14 @@ __global__ void corr_forward_kernel(int R,
 
 template <typename scalar_t>
 __global__ void corr_backward_kernel(int R,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2,
-    const torch::PackedTensorAccessor32<float,5,torch::RestrictPtrTraits> coords,
-    const torch::PackedTensorAccessor32<LongType,1,torch::RestrictPtrTraits> us,
-    const torch::PackedTensorAccessor32<LongType,1,torch::RestrictPtrTraits> vs,
-    const torch::PackedTensorAccessor32<float,6,torch::RestrictPtrTraits> corr_grad,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1_grad,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2_grad)
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap1,
+    const torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap2,
+    const torch::PackedTensorAccessor64<float,5,torch::RestrictPtrTraits> coords,
+    const torch::PackedTensorAccessor64<LongType,1,torch::RestrictPtrTraits> us,
+    const torch::PackedTensorAccessor64<LongType,1,torch::RestrictPtrTraits> vs,
+    const torch::PackedTensorAccessor64<float,6,torch::RestrictPtrTraits> corr_grad,
+    torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap1_grad,
+    torch::PackedTensorAccessor64<scalar_t,5,torch::RestrictPtrTraits> fmap2_grad)
 {
   // diameter
   const int D = 2*R + 2;
@@ -149,12 +149,12 @@ std::vector<torch::Tensor> altcorr_cuda_forward(
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(fmap1.scalar_type(), "corr_forward_kernel", ([&] {
       corr_forward_kernel<scalar_t><<<BLOCKS(B * M * H * W * D * D), THREADS>>>(radius,
-        fmap1.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-        fmap2.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-        coords.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-        ii.packed_accessor32<LongType,1,torch::RestrictPtrTraits>(),
-        jj.packed_accessor32<LongType,1,torch::RestrictPtrTraits>(),
-        corr.packed_accessor32<scalar_t,6,torch::RestrictPtrTraits>());
+        fmap1.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+        fmap2.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+        coords.packed_accessor64<float,5,torch::RestrictPtrTraits>(),
+        ii.packed_accessor64<LongType,1,torch::RestrictPtrTraits>(),
+        jj.packed_accessor64<LongType,1,torch::RestrictPtrTraits>(),
+        corr.packed_accessor64<scalar_t,6,torch::RestrictPtrTraits>());
   }));
 
   torch::Tensor x = coords.index({Slice(), Slice(), 0, None, None});
@@ -211,14 +211,14 @@ std::vector<torch::Tensor> altcorr_cuda_backward(
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(fmap1.scalar_type(), "corr_backward_kernel", ([&] {
     corr_backward_kernel<scalar_t><<<BLOCKS(B * M * H * W * D * D), THREADS>>>(radius,
-      fmap1.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-      fmap2.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-      coords.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-      ii.packed_accessor32<LongType,1,torch::RestrictPtrTraits>(),
-      jj.packed_accessor32<LongType,1,torch::RestrictPtrTraits>(),
-      corr_grad.packed_accessor32<float,6,torch::RestrictPtrTraits>(),
-      fmap1_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-      fmap2_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>());
+      fmap1.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+      fmap2.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+      coords.packed_accessor64<float,5,torch::RestrictPtrTraits>(),
+      ii.packed_accessor64<LongType,1,torch::RestrictPtrTraits>(),
+      jj.packed_accessor64<LongType,1,torch::RestrictPtrTraits>(),
+      corr_grad.packed_accessor64<float,6,torch::RestrictPtrTraits>(),
+      fmap1_grad.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>(),
+      fmap2_grad.packed_accessor64<scalar_t,5,torch::RestrictPtrTraits>());
   }));
 
   return {fmap1_grad, fmap2_grad};
