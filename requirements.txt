@@ -5,7 +5,6 @@ wheel
 tqdm
 evo
 scipy
-open3d
 gdown
 tensorboard
 opencv-python

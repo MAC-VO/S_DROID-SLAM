@@ -10,7 +10,6 @@ from .droid_backend import DroidBackend
 from .trajectory_filler import PoseTrajectoryFiller
 
 from collections import OrderedDict
-from torch.multiprocessing import Process
 
 
 class Droid:
@@ -18,7 +17,6 @@ class Droid:
         super(Droid, self).__init__()
         self.load_weights(args.weights)
         self.args = args
-        self.disable_vis = args.disable_vis
         self.vo_only = args.vo_only  # VO-only mode skips global BA
 
         # store images, depth, poses, intrinsics (shared between processes)
@@ -32,12 +30,6 @@ class Droid:
         
         # backend process
         self.backend = DroidBackend(self.net, self.video, self.args)
-
-        # visualizer
-        if not self.disable_vis:
-            from .visualizer.droid_visualizer import visualization_fn
-            self.visualizer = Process(target=visualization_fn, args=(self.video, None))
-            self.visualizer.start()
 
         # post processor - fill in poses for non-keyframes
         self.traj_filler = PoseTrajectoryFiller(self.net, self.video)
