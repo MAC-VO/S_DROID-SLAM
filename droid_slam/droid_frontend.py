@@ -46,6 +46,9 @@ class DroidFrontend:
         if hasattr(args, "motion_damping"):
             self.motion_damping = args.motion_damping
 
+        # vo_only: strict two-frame BA on the (L, L-1) pair only
+        self.vo_only = bool(getattr(args, "vo_only", False))
+
     def _init_next_state(self):
         # set pose / depth for next iteration
         self.video.poses[self.t1] = self.video.poses[self.t1 - 1]
@@ -62,8 +65,57 @@ class DroidFrontend:
             next_pose = SE3.exp(damped_vel) * poses[self.t1 - 1]
             self.video.poses[self.t1] = next_pose.data
 
+    def _add_pairwise_factors(self, latest: int) -> None:
+        """Add the bidirectional (latest, latest-1) factor pair (+ stereo self-edge)."""
+        ii_list = [latest, latest - 1]
+        jj_list = [latest - 1, latest]
+        # Stereo self-edge gives the known-baseline depth constraint at `latest`.
+        if self.video.stereo:
+            ii_list.append(latest)
+            jj_list.append(latest)
+        device = self.graph.device
+        ii = torch.as_tensor(ii_list, dtype=torch.long, device=device)
+        jj = torch.as_tensor(jj_list, dtype=torch.long, device=device)
+        self.graph.add_factors(ii, jj)
+
+    def _update_vo_only(self):
+        """Strict two-frame BA between L and L-1 (vo_only mode)."""
+        self.count += 1
+        self.t1 += 1
+        L = self.t1 - 1
+
+        # Drop everything from the previous pair so the linear system only sees L,L-1.
+        if self.graph.ii.numel() > 0:
+            mask = torch.ones_like(self.graph.ii, dtype=torch.bool)
+            self.graph.rm_factors(mask, store=False)
+
+        self._add_pairwise_factors(L)
+
+        # Sensor-disparity injection at the new keyframe (matches the default branch).
+        self.video.disps[L] = torch.where(
+            self.video.disps_sens[L] > 0,
+            self.video.disps_sens[L],
+            self.video.disps[L],
+        )
+
+        # T_{L-1} is the gauge (t0=L), only T_L and disps at {L-1, L} are updated.
+        for _ in range(self.iters1 + self.iters2):
+            self.graph.update(t0=L, t1=L + 1, use_inactive=False)
+
+        # Seed pose/disparity for the next slot (mirrors the default path).
+        self.video.poses[self.t1] = self.video.poses[self.t1 - 1]
+        self.video.disps[self.t1] = torch.quantile(
+            self.video.disps[self.t1 - self.depth_window - 1 : self.t1 - 1], 0.7
+        )
+
+        self.video.dirty[self.graph.ii.min() : self.t1] = True
+
     def _update(self):
         """add edges, perform update"""
+
+        if self.vo_only:
+            self._update_vo_only()
+            return
 
         self.count += 1
         self.t1 += 1
@@ -116,8 +168,47 @@ class DroidFrontend:
         # update visualization
         self.video.dirty[self.graph.ii.min() : self.t1] = True
 
+    def _initialize_vo_only(self):
+        """Bootstrap warmup keyframes via sequential strict pairwise BA."""
+        self.t0 = 0
+        self.t1 = self.video.counter.value
+
+        for i in range(1, self.t1):
+            # Constant-pose seed: Frame i starts where i-1 currently sits.
+            self.video.poses[i] = self.video.poses[i - 1].clone()
+
+            if self.graph.ii.numel() > 0:
+                mask = torch.ones_like(self.graph.ii, dtype=torch.bool)
+                self.graph.rm_factors(mask, store=False)
+
+            self._add_pairwise_factors(i)
+
+            self.video.disps[i] = torch.where(
+                self.video.disps_sens[i] > 0,
+                self.video.disps_sens[i],
+                self.video.disps[i],
+            )
+
+            for _ in range(self.iters1 + self.iters2):
+                self.graph.update(t0=i, t1=i + 1, use_inactive=False)
+
     def _initialize(self):
         """initialize the SLAM system"""
+
+        if self.vo_only:
+            self._initialize_vo_only()
+            self.video.poses[self.t1] = self.video.poses[self.t1 - 1].clone()
+            self.video.disps[self.t1] = self.video.disps[self.t1 - 4 : self.t1].mean()
+
+            self.is_initialized = True
+            self.last_pose = self.video.poses[self.t1 - 1].clone()
+            self.last_disp = self.video.disps[self.t1 - 1].clone()
+            self.last_time = self.video.tstamp[self.t1 - 1].clone()
+
+            with self.video.get_lock():
+                self.video.ready.value = 1
+                self.video.dirty[: self.t1] = True
+            return
 
         self.t0 = 0
         self.t1 = self.video.counter.value
