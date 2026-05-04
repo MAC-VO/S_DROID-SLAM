@@ -15,13 +15,15 @@ CUDA_ARCH=$(python -c "import torch; cc = torch.cuda.get_device_capability(); pr
 export TORCH_CUDA_ARCH_LIST="$CUDA_ARCH"
 echo "Compiling for GPU architecture: $CUDA_ARCH"
 
-if python -c "import droid_backends" 2>/dev/null && [[ "${FORCE_REBUILD:-0}" != "1" ]]; then
+# `-P` so Python doesn't auto-prepend CWD onto sys.path; otherwise the source
+# tree masks a missing pip install and the check always reports installed.
+if python -P -c "import droid_backends" 2>/dev/null && [[ "${FORCE_REBUILD:-0}" != "1" ]]; then
     echo "[DROID_SLAM] Already installed, skipping. Use --force to reinstall."
     exit 0
 fi
 
 # Install lietorch (skip if already installed, e.g. from DPVO)
-if ! python -c "import lietorch" 2>/dev/null; then
+if ! python -P -c "import lietorch" 2>/dev/null; then
     echo "Installing lietorch..."
     pip install -v "$SCRIPT_DIR/thirdparty/lietorch" --no-build-isolation
 else
